@@ -72,15 +72,15 @@ def matrix_to_seq(qam_matrix):
             seq.append(qam_matrix[j][k])
     return seq
 
-def bpsk_demod(qamSeq): # dans la matrice le premier caractere de la 1ère et deuxieme ligne (PBCH) est un 0j, ici on l'ignore
+def bpsk_demod(qamSeq):
     seq_final = []
     for car in qamSeq:
-        if np.real(car) < 0.5 and (np.imag(car) < 0.5 or np.imag(car) > 0.5): # variation bruit
+        if np.real(car) < 0:
             seq_final.append(0)
-        elif np.real(car) > 0.5 and (np.imag(car) < 0.5 or np.imag(car) > 0.5): # variation bruit
+        else:
             seq_final.append(1)
     return seq_final
-        
+
 seq_decode = bpsk_demod(matrix_to_seq(qamMatrix))
 
 #print(seq_decode)
@@ -116,7 +116,7 @@ def hamming748_decode(seq):
         for i in range (len(y74)):
             parity = parity + y74[i]
         #print("parity", parity)
-        if parity % 2 == seq[7] or indice_syndrome == 0:
+        if parity % 2 == seq_8_bits[7] or indice_syndrome == 0:
             final_list += (y74[:4].tolist()) # d'apres la doc c'est les 4 premiers bits les "data bits"
         else  :
             print("Deux erreurs ont ete detectees") # le mieux c'est de remplacer par un raise
@@ -180,7 +180,7 @@ def user_info(user_block):
 
 
 pbchu()
-print(Dic_info_user["user_ident",7])
+#print(Dic_info_user["user_ident",7])
 
 def qpsk_demod(qamSeq): # dans la matrice le premier caractere de la 1ère et deuxieme ligne (PBCH) est un 0j, ici on l'ignore
     seq_final = []
@@ -201,18 +201,31 @@ def qpsk_demod(qamSeq): # dans la matrice le premier caractere de la 1ère et de
 
 
 def PDDCHU_decode_seq(qam_seq, user_ident):
-    if Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 0: #BPSK
-        return bpsk_demod(hamming748_decode(qam_seq))
+    if Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 0: #BPSK7
+        bpsk_decoded = bpsk_demod(qam_seq)
+        print("Séquence BPSK décodée :", bpsk_decoded)
+        return hamming748_decode(bpsk_demod(qam_seq))
         
     elif Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 2: #QPSK
-        return qpsk_demod(hamming748_decode(qam_seq))
-    
+        qpsk_decoded = qpsk_demod(qam_seq)
+        print("Séquence QPSK décodée :", qpsk_decoded)
+        return hamming748_decode(qpsk_demod(qam_seq))
     else:
         print("FEC used shouldn't be used in this project") 
 
 
 
-def PDCCHU_decode_from_user()
+def PDCCHU_decode_from_user(user_ident):
     symb_start = Dic_info_user["user_ident", user_ident]["Symb_start_of_PDCCHU"]
     RB_start = Dic_info_user["user_ident", user_ident]["RB_start_of_PDCCHU"]
-    qam_seq = qamMatrix[symb_start - 1, RB_start * 12:(RB_start + 1) * 12]
+    print("RB_start :", RB_start)
+    print("symb_start :", symb_start)
+    print("MCS = ", Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"])
+    print("Dimensions de qamMatrix :", qamMatrix.shape)
+    qam_seq = qamMatrix[symb_start, RB_start * 12:(RB_start + 1) * 12]
+    print("Séquence QAM extraite :", qam_seq)
+    return PDDCHU_decode_seq(qam_seq, user_ident)
+
+
+print(PDCCHU_decode_from_user(1))
+

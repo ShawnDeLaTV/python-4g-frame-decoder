@@ -27,4 +27,4 @@ def test_qam16():
     assert qam16_demod(np.array([1.1+1j*-0.8,-0.2+1j*0.8,1.2+1j*-0.9,-0.1+1j*-0.8])) == [0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0]
 
 if __name__ == "__main__":
-    print(test_bpsk())
+    print(test_qpsk())
