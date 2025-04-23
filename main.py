@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import ticker, cm
 import pytest
 
-import sk_dsp_comm.fec_conv as fec
+#import sk_dsp_comm.fec_conv as fec
 
 my_data = np.genfromtxt(r"tfMatrix.csv", delimiter=';')
 mat_complex = my_data[:,0::2] +1j*my_data[:,1::2] #Complex Matrice
@@ -207,25 +207,44 @@ def PDDCHU_decode_seq(qam_seq, user_ident):
         return hamming748_decode(bpsk_demod(qam_seq))
         
     elif Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 2: #QPSK
-        qpsk_decoded = qpsk_demod(qam_seq)
-        print("Séquence QPSK décodée :", qpsk_decoded)
         return hamming748_decode(qpsk_demod(qam_seq))
     else:
         print("FEC used shouldn't be used in this project") 
 
 
-
 def PDCCHU_decode_from_user(user_ident):
     symb_start = Dic_info_user["user_ident", user_ident]["Symb_start_of_PDCCHU"]
     RB_start = Dic_info_user["user_ident", user_ident]["RB_start_of_PDCCHU"]
-    print("RB_start :", RB_start)
-    print("symb_start :", symb_start)
-    print("MCS = ", Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"])
-    print("Dimensions de qamMatrix :", qamMatrix.shape)
-    qam_seq = qamMatrix[symb_start, RB_start * 12:(RB_start + 1) * 12]
-    print("Séquence QAM extraite :", qam_seq)
+    MCS = Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"]
+    if MCS == 0: nb_symbols=72 
+    else: nb_symbols=36
+    qam_seq = qamMatrix[symb_start - 3, (RB_start - 1) * 12 : (RB_start - 1) * 12 + nb_symbols] #cetait la source d'erreur avant : pour bpsk c'est codé sur 72 symb et qpsk seulement sur 36
     return PDDCHU_decode_seq(qam_seq, user_ident)
 
 
-print(PDCCHU_decode_from_user(1))
+print(PDCCHU_decode_from_user(2))
 
+def decode_PDDCHU_stream(pdcchu_stream):
+    user_ident = pdcchu_stream[:8]
+    MCS_pf_PDSCHU = pdcchu_stream[8:14]
+    sym_start_PDSCHU = pdcchu_stream[14:18]
+    RB_start_PDSCHU = pdcchu_stream[18:24]
+    RB_size = pdcchu_stream[24:34]
+    CRC_flag = pdcchu_stream[34:36]
+
+    Dic_info_user["user_ident", bin2dec(user_ident)].update({
+        "MCS_pf_PDSCHU": bin2dec(MCS_pf_PDSCHU),
+        "sym_start_PDSCHU": bin2dec(sym_start_PDSCHU),
+        "RB_start_PDSCHU": bin2dec(RB_start_PDSCHU),
+        "RB_size": bin2dec(RB_size),
+        "CRC_flag": bin2dec(CRC_flag)
+    })
+
+    return bin2dec(user_ident),bin2dec(MCS_pf_PDSCHU),bin2dec(sym_start_PDSCHU), bin2dec(RB_start_PDSCHU), bin2dec(RB_size), bin2dec(CRC_flag)
+
+decode_PDDCHU_stream(PDCCHU_decode_from_user(2))
+
+print(Dic_info_user["user_ident", 2])
+
+def PDSCH_demod(qamSeq,mcs):
+    # je ne comprend pas le truc avec le rate mais dans le code de noan ça a pas l'air important
