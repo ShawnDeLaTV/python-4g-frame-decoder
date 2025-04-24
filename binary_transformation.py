@@ -1,3 +1,6 @@
+import numpy as np
+import math
+
 """ Apply the Cesar transformation to the ASCII input to perform (trivial) decoding 
 """ 
 def cesarDecode(userIdent,messEnc): 
@@ -72,4 +75,4 @@ def test_bitToByte():
     assert bitToByte(np.array([0,1,1,1,1,1,0,0,0,0,0,0,1,1,0,1,1,0,1,1,1,1,0,0,0,1,0,0,1,0,0,0])) == [62, 176, 61, 18]
     assert bitToByte(np.array([1,0,0,0,1,1,1,0,1,0,0,1,1,1,1,0,0,0,0,1,1,1,0,0,1,0,1,1,1,1,1,1,1,0,1,0,0,1,1,0,0,1,1,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,1,1,1])) == [113, 121, 56, 253, 101, 22, 18, 232]
 
-test_bitToByte()
+#test_bitToByte()

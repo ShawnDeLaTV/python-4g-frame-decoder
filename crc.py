@@ -1,3 +1,5 @@
+import numpy as np
+
 """ Check the CRC polynom. Returns 1 if the CRC is correct and 0 otherwise """
 def crc_decode(data,poly):
     data2 = np.copy(data)       # Copy of working vector 
@@ -8,12 +10,12 @@ def crc_decode(data,poly):
             data2[i:i+lenGW:1] = np.logical_xor(data2[i:i+lenGW:1],poly);
 	# syndrome is now equal to the remainder of xor division
     syndrome = data2[ lenR - lenGW + 1: lenR : 1];
-    print(syndrome)
+    #print(syndrome)
     if all(syndrome == 0x00):
         err = 1
     else: 
-        err = 0;
-    print(err)
+        err = 0
+    #print(err)
     return err
 
 
@@ -57,5 +59,5 @@ def test_crcDecode():
 
 
 
-test_crcGen()
-test_crcDecode()
+#test_crcGen()
+#test_crcDecode()

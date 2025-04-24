@@ -3,8 +3,12 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib import ticker, cm
 import pytest
+from qam16_demod import qam16_demod
+import sk_dsp_comm.fec_conv as fec
+from crc import get_crc_poly, crc_decode
+from binary_transformation import bitToByte, cesarDecode, toASCII
 
-#import sk_dsp_comm.fec_conv as fec
+
 
 my_data = np.genfromtxt(r"tfMatrix.csv", delimiter=';')
 mat_complex = my_data[:,0::2] +1j*my_data[:,1::2] #Complex Matrice
@@ -50,13 +54,13 @@ def powerDistributionGraph(Z):
 
 
 
-powerDistributionGraph(tfMatrix_short)
+#powerDistributionGraph(tfMatrix_short)
 
 qamMatrix = tfMatrix_short[2:]
 
 #print("QAM MATRIX SHAPE = ", qamMatrix.shape)
 
-powerDistributionGraph(qamMatrix)
+#powerDistributionGraph(qamMatrix)
 
 
 # Preuve que le premier symbole est bien BPSK (partie imaginaire nulle, varie entre +1 et -1 en réel)
@@ -178,8 +182,6 @@ def user_info(user_block):
         "HARQ_of_PDCCHU" : HARQ_of_PDCCHU}
 
 
-
-pbchu()
 #print(Dic_info_user["user_ident",7])
 
 def qpsk_demod(qamSeq): # dans la matrice le premier caractere de la 1ère et deuxieme ligne (PBCH) est un 0j, ici on l'ignore
@@ -203,13 +205,13 @@ def qpsk_demod(qamSeq): # dans la matrice le premier caractere de la 1ère et de
 def PDDCHU_decode_seq(qam_seq, user_ident):
     if Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 0: #BPSK7
         bpsk_decoded = bpsk_demod(qam_seq)
-        print("Séquence BPSK décodée :", bpsk_decoded)
+        #print("Séquence BPSK décodée :", bpsk_decoded)
         return hamming748_decode(bpsk_demod(qam_seq))
         
     elif Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 2: #QPSK
         return hamming748_decode(qpsk_demod(qam_seq))
     else:
-        print("FEC used shouldn't be used in this project") 
+        print("La fec n'est pas reconnue") 
 
 
 def PDCCHU_decode_from_user(user_ident):
@@ -222,29 +224,95 @@ def PDCCHU_decode_from_user(user_ident):
     return PDDCHU_decode_seq(qam_seq, user_ident)
 
 
-print(PDCCHU_decode_from_user(2))
+#print(PDCCHU_decode_from_user(2))
 
 def decode_PDDCHU_stream(pdcchu_stream):
     user_ident = pdcchu_stream[:8]
-    MCS_pf_PDSCHU = pdcchu_stream[8:14]
+    MCS_of_PDSCHU = pdcchu_stream[8:14]
     sym_start_PDSCHU = pdcchu_stream[14:18]
     RB_start_PDSCHU = pdcchu_stream[18:24]
     RB_size = pdcchu_stream[24:34]
     CRC_flag = pdcchu_stream[34:36]
 
     Dic_info_user["user_ident", bin2dec(user_ident)].update({
-        "MCS_pf_PDSCHU": bin2dec(MCS_pf_PDSCHU),
+        "MCS_of_PDSCHU": bin2dec(MCS_of_PDSCHU),
         "sym_start_PDSCHU": bin2dec(sym_start_PDSCHU),
         "RB_start_PDSCHU": bin2dec(RB_start_PDSCHU),
         "RB_size": bin2dec(RB_size),
         "CRC_flag": bin2dec(CRC_flag)
     })
 
-    return bin2dec(user_ident),bin2dec(MCS_pf_PDSCHU),bin2dec(sym_start_PDSCHU), bin2dec(RB_start_PDSCHU), bin2dec(RB_size), bin2dec(CRC_flag)
+    return bin2dec(user_ident),bin2dec(MCS_of_PDSCHU),bin2dec(sym_start_PDSCHU), bin2dec(RB_start_PDSCHU), bin2dec(RB_size), bin2dec(CRC_flag)
 
-decode_PDDCHU_stream(PDCCHU_decode_from_user(2))
 
-print(Dic_info_user["user_ident", 2])
+#print(Dic_info_user["user_ident", 2])
 
 def PDSCH_demod(qamSeq,mcs):
     # je ne comprend pas le truc avec le rate mais dans le code de noan ça a pas l'air important
+    if mcs%5 == 0:
+        return bpsk_demod(qamSeq)
+    elif mcs in [i for i in range (1,37,5)]:
+        return qpsk_demod(qamSeq)
+    elif mcs in [k for k in range (2,38,5)]:
+        return qam16_demod(qamSeq)
+    else :
+        raise "MCS non prit en charge"
+    
+def PDSCH_fec(qamSeq,mcs):
+    if mcs in [25,26,27]:
+        return hamming748_decode(qamSeq)
+    elif mcs in [5,6,7]:
+        return (fec.FECConv(('1011011','1111001'),6)).viterbi_decoder(np.array(qamSeq).astype(int),'hard').astype(int).tolist()
+    else :
+        raise "MCS non prit en charge"
+    
+def decode_PDSCHU(user_ident):
+    user = Dic_info_user["user_ident", user_ident]
+    symb_start = user["sym_start_PDSCHU"]
+    rb_start = user["RB_start_PDSCHU"]
+    rb_size = user["RB_size"]
+    mcs = user["MCS_of_PDSCHU"]
+    crc_size = user["CRC_flag"]
+
+    start_index = (symb_start - 1) * 624 + (rb_start - 1) * 12 #décale en 1D le départ
+    end_index = start_index + (rb_size * 12) # décale en 1D l'arrivée
+
+    qamSeq = tfMatrix_short.flatten('C')[start_index:end_index] #matrice de T/F en 1D (flatten)
+
+    demod = PDSCH_demod(qamSeq, mcs)
+    fec = PDSCH_fec(demod, mcs)
+    if PDSCH_crc(fec, crc_size):
+        return fec
+    else:
+        raise ValueError("CRC invalide")
+
+
+
+def PDSCH_crc(qamSeq,crcSize):
+    crc_poly = get_crc_poly(8*(1+crcSize))
+    return crc_decode(qamSeq,crc_poly)
+
+def PDSCHU_to_string(user_ident):
+    mess = bitToByte(decode_PDSCHU(user_ident))
+    real_mess = cesarDecode(user_ident,mess)
+    final_mess = "".join(toASCII(real_mess))
+    return final_mess
+
+def extract_key():
+    global Dic_key
+    pbchu()
+    Dic_key = {}
+    for user_ident_tuple in Dic_info_user:
+        user_ident = user_ident_tuple[1]
+        try:
+            pdcchu_stream = PDCCHU_decode_from_user(user_ident)
+            decode_PDDCHU_stream(pdcchu_stream)            
+            message = PDSCHU_to_string(user_ident)
+            key = message.split("key is ")[1].split()[0]
+            Dic_key[user_ident] = key 
+        except Exception as e:
+            print(f"erreur utilisateur {user_ident} :", e) #il y a un probleme de l'user 11
+
+
+extract_key()
+print(Dic_key)
