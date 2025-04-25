@@ -220,7 +220,11 @@ def PDCCHU_decode_from_user(user_ident):
     MCS = Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"]
     if MCS == 0: nb_symbols=72 
     else: nb_symbols=36
-    qam_seq = qamMatrix[symb_start - 3, (RB_start - 1) * 12 : (RB_start - 1) * 12 + nb_symbols] #cetait la source d'erreur avant : pour bpsk c'est codé sur 72 symb et qpsk seulement sur 36
+
+    start_index = (symb_start - 1) * 624 + (RB_start - 1) * 12 #décale en 1D le départ
+    end_index = start_index + (nb_symbols) # décale en 1D l'arrivée
+
+    qam_seq = tfMatrix_short.flatten('C')[start_index:end_index] #matrice de T/F en 1D (flatten)
     return PDDCHU_decode_seq(qam_seq, user_ident)
 
 
@@ -276,7 +280,6 @@ def decode_PDSCHU(user_ident):
 
     start_index = (symb_start - 1) * 624 + (rb_start - 1) * 12 #décale en 1D le départ
     end_index = start_index + (rb_size * 12) # décale en 1D l'arrivée
-
     qamSeq = tfMatrix_short.flatten('C')[start_index:end_index] #matrice de T/F en 1D (flatten)
 
     demod = PDSCH_demod(qamSeq, mcs)
@@ -308,6 +311,7 @@ def extract_key():
             pdcchu_stream = PDCCHU_decode_from_user(user_ident)
             decode_PDDCHU_stream(pdcchu_stream)            
             message = PDSCHU_to_string(user_ident)
+            print(message)
             key = message.split("key is ")[1].split()[0]
             Dic_key[user_ident] = key 
         except Exception as e:
@@ -315,4 +319,8 @@ def extract_key():
 
 
 extract_key()
+#pdcchu_stream = PDCCHU_decode_from_user(11)
+#decode_PDDCHU_stream(pdcchu_stream)            
+#message = PDSCHU_to_string(11)
+
 print(Dic_key)
