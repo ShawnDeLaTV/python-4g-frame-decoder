@@ -1,26 +1,18 @@
-import numpy as np
-import math
-import matplotlib.pyplot as plt
-from matplotlib import ticker, cm
-import pytest
-from qam16_demod import qam16_demod
-import sk_dsp_comm.fec_conv as fec
-from crc import get_crc_poly, crc_decode
-from binary_transformation import bitToByte, cesarDecode, toASCII
+from imports import *
 
 
-
-my_data = np.genfromtxt(r"tfMatrix.csv", delimiter=';')
-mat_complex = my_data[:,0::2] +1j*my_data[:,1::2] #Complex Matrice
-
+my_data = np.genfromtxt(r"tfMatrix_3.csv", delimiter=';') #file load 
+mat_complex = my_data[:,0::2] +1j*my_data[:,1::2] # complex matrix
 #print(len(mat_complex[0]))
 #print(len(mat_complex))
 
-N_Re = 624 # Nombre de sous_porteuses utiles
+N_Re = 624 # number of subcarriers
 N = len(mat_complex[0])
-Dic_first_slot_PBCH = {}
+
+
+Dic_first_slot_PBCH = {} #dictionnary for PBCH 
 #print("N = ", N)
-truncated_mat1 = mat_complex[:,1:N_Re//2+1]
+truncated_mat1 = mat_complex[:,1:N_Re//2+1] 
 truncated_mat2 = mat_complex[:,N-N_Re//2:N]
 #print("taille matrice complexe", mat_complex.shape)
 
@@ -32,7 +24,7 @@ truncated_mat2 = mat_complex[:,N-N_Re//2:N]
 #print(len(truncated_mat2[0]))
 #print(len(truncated_mat2))
 
-tfMatrix_short = np.hstack((truncated_mat1,truncated_mat2)) #la nouvelle matrix est la concaténation horizontale des deux matrices tronqués
+tfMatrix_short = np.hstack((truncated_mat1,truncated_mat2)) #new matrix composed the 2 useful matrixs
 
 #print("taille tf_matrix_short = ", tfMatrix_short.shape)
 
@@ -42,88 +34,95 @@ tfMatrix_short = np.hstack((truncated_mat1,truncated_mat2)) #la nouvelle matrix 
 
 def powerDistributionGraph(Z):
     """
-    Draw the power distribution graph
+    Draw the power distribution graph of T/F Matrix
     """
     fig, ax = plt.subplots()
     cs = ax.contourf(np.linspace(0, len(Z[0]), len(Z[0])), np.linspace(0,len(Z), len(Z)), np.abs(Z)**2)
     cbar = fig.colorbar(cs)
-    ax.set_title('_') # je ne sais pas à quoi ça correspond 
-    ax.set_xlabel('_') #je ne sais pas à quoi ça correspond mais c'est les lignes de la matrice
-    ax.set_ylabel('_') #je ne sais pas à quoi ça correspond mais c'est les colonnes de la matrice
-    #plt.show()
+    ax.set_title('Power distribution graph') 
+    ax.set_xlabel('Subcarrier') 
+    ax.set_ylabel('OFDM Symbole') 
+    plt.show()
 
 
 
 #powerDistributionGraph(tfMatrix_short)
 
-qamMatrix = tfMatrix_short[2:]
+qamMatrix = tfMatrix_short[2:] #removing the 2 synchronized symbols
 
 #print("QAM MATRIX SHAPE = ", qamMatrix.shape)
 
 #powerDistributionGraph(qamMatrix)
 
 
-# Preuve que le premier symbole est bien BPSK (partie imaginaire nulle, varie entre +1 et -1 en réel)
+# Proof that the first symbol is BPSK
 #for j in range (2):
     #print(f"Symbole {j+1}")
     #for k in range (len(qamMatrix)):
         #print(qamMatrix[j][k])
 
 def matrix_to_seq(qam_matrix):
+    """
+    Utile ?
+    """
     seq = []
     for j in range (2):
         for k in range (len(qam_matrix)):
             seq.append(qam_matrix[j][k])
     return seq
 
+
 def bpsk_demod(qamSeq):
+    """
+    Function to demodulate BPSK modulation sequence
+    """
     seq_final = []
     for car in qamSeq:
-        if np.real(car) < 0:
+        if np.real(car) < 0: # state = 0
             seq_final.append(0)
-        else:
+        else:   # state = 1
             seq_final.append(1)
     return seq_final
 
-seq_decode = bpsk_demod(matrix_to_seq(qamMatrix))
-
+#seq_decode = bpsk_demod(matrix_to_seq(qamMatrix))
 #print(seq_decode)
-
-
-pbch_matrix_seq = qamMatrix[0, :48] # 48 premier bits
+#print(seq_decode)
 
 #print (len(pbch_matrix_seq))
 
-# --- Calling Hamming decoding function
-#for k in range (6):
-#        seq_8_bits = seq[8*k:8*(k+1)]
-
 def hamming748_decode(seq):
+    """
+    Function to decode hamming748 encode
+    """
     final_list = []
-    for k in range(len(seq) // 8):
+    for k in range(len(seq) // 8): # cut into seq of 8 bits
         seq_8_bits = seq[8*k:8*(k+1)]
-        #print(seq_8_bits)
-        H = np.array([
+        
+        H = np.array([ #define H matrix
         [0, 0, 0, 1, 1, 1, 1],
         [0, 1, 1, 0, 0, 1, 1],
         [1, 0, 1, 0, 1, 0, 1]],dtype=int)
-        y74 = np.array(seq_8_bits[:7],dtype=int)
-        syndrome = np.dot(H,y74) % 2
-        indice_syndrome = 0
+
+        y74 = np.array(seq_8_bits[:7],dtype=int) #y74 (7 first bits)
+
+        syndrome = np.dot(H,y74) % 2 #multiplication of H and y74
+        
+        syndrome_index = 0
         for i in range(len(syndrome)):
-            indice_syndrome = indice_syndrome + syndrome[-1 - i] * (2 ** i)
-        # cas
-        #print("indice syndrome" , indice_syndrome)
-        if indice_syndrome != 0:
-            y74[indice_syndrome-1] = (y74[indice_syndrome-1]+1) %2 #bitflip
+            syndrome_index = syndrome_index + syndrome[-1 - i] * (2 ** i) # syndrom vector to int
+
+        if syndrome_index != 0: # one or more error detected
+            y74[syndrome_index-1] = (y74[syndrome_index-1]+1) %2 #bitflip on bit error
+
         parity = 0
         for i in range (len(y74)):
-            parity = parity + y74[i]
-        #print("parity", parity)
-        if parity % 2 == seq_8_bits[7] or indice_syndrome == 0:
-            final_list += (y74[:4].tolist()) # d'apres la doc c'est les 4 premiers bits les "data bits"
-        else  :
-            print("Deux erreurs ont ete detectees") # le mieux c'est de remplacer par un raise
+            parity = parity + y74[i] #parity calculous
+
+        if parity % 2 == seq_8_bits[7] or syndrome_index == 0: #valid case
+            final_list += (y74[:4].tolist()) #keep only the 4 first bits
+        else  : #two errors
+            raise("Two errors have been detected")
+        
     return final_list
 
 
@@ -139,8 +138,10 @@ def bin2dec(nb):
     
 def info_cell_users(matrix_first_48_bits):
     global Dic_first_slot_PBCH
-
-    bpsk_decoded = bpsk_demod(matrix_first_48_bits) #Matrice de 0 et de 1 sans la partie de synchronisation (48 premiers bits)
+    """
+    Fonction to recover Cell info and number of user
+    """
+    bpsk_decoded = bpsk_demod(matrix_first_48_bits)
     decoded_hamming = hamming748_decode(bpsk_decoded) 
     cell_user = bin2dec(decoded_hamming[:18])
     number_user = bin2dec(decoded_hamming[18:])
@@ -156,19 +157,25 @@ def info_cell_users(matrix_first_48_bits):
 # tout ne passe pas sur un seul symbole ofdm.
 
 
-def pbchu():
+def decode_pbchu():
+    """
+    Decode pbchu infos
+    """
     global Dic_info_user
     Dic_info_user = {}
-    info_cell_users(qamMatrix[0, :48])
-    nb_user =Dic_first_slot_PBCH["number_user"]
+    info_cell_users(qamMatrix[0, :48]) 
+    nb_user = Dic_first_slot_PBCH["number_user"]
     
-    for k in range(nb_user-1):
-        qam_flat = qamMatrix.flatten()  # Met toute la matrice en un seul vecteur 1D
+    for k in range(nb_user-1): #for each user, decode user info
+        qam_flat = qamMatrix.flatten() #flat matrix to solve overtaking the matrix size
         bpsk_decoded = bpsk_demod(qam_flat[48*(k+1):48*(k+2)])
         decoded_hamming = hamming748_decode(bpsk_decoded) 
         user_info(decoded_hamming)
 
 def user_info(user_block):
+    """
+    Slice user info and store it in a dictionnary
+    """
     user_ident = bin2dec(user_block[:8])
     MCS_of_PDCCHU = bin2dec(user_block[8:10])
     Symb_start_of_PDCCHU = bin2dec(user_block[10:14])
@@ -182,11 +189,12 @@ def user_info(user_block):
         "HARQ_of_PDCCHU" : HARQ_of_PDCCHU}
 
 
-#print(Dic_info_user["user_ident",7])
-
-def qpsk_demod(qamSeq): # dans la matrice le premier caractere de la 1ère et deuxieme ligne (PBCH) est un 0j, ici on l'ignore
+def qpsk_demod(qamSeq):
+    """
+    Function to demodulate QPSK sequence
+    """
     seq_final = []
-    for car in qamSeq:
+    for car in qamSeq: # each case depends on real and imaginary part, see doc
         if np.real(car) < 0 and (np.imag(car) > 0):
             seq_final.append(0)
             seq_final.append(1)
