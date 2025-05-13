@@ -197,7 +197,7 @@ def qpsk_demod(qamSeq):
     return seq_final
 
 
-def PDDCHU_decode_seq(qam_seq, user_ident):
+def PDCCHU_decode_seq(qam_seq, user_ident):
     """
     Function to decode PDCCHU sequence"""
     if Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 0: #BPSK
@@ -227,7 +227,7 @@ def PDCCHU_decode_from_user(user_ident):
 
 #print(PDCCHU_decode_from_user(2))
 
-def decode_PDDCHU_stream(pdcchu_stream):
+def decode_PDCCHU_stream(pdcchu_stream):
     """
     Funciton to fill the dictionnary with PDCCHU infos
     """
