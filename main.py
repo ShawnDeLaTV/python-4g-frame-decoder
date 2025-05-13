@@ -222,7 +222,7 @@ def PDCCHU_decode_from_user(user_ident):
     end_index = start_index + (nb_symbols) # flatten the ending index to fit with the 1D matrix
 
     qam_seq = tfMatrix_short.flatten('C')[start_index:end_index] #flatten the matrix to 1D
-    return PDDCHU_decode_seq(qam_seq, user_ident)
+    return PDCCHU_decode_seq(qam_seq, user_ident)
 
 
 #print(PDCCHU_decode_from_user(2))
@@ -324,7 +324,7 @@ def extract_key():
         user_ident = user_ident_tuple[1] #user is 2nd element
         try:
             pdcchu_stream = PDCCHU_decode_from_user(user_ident) #decode the PDCCHU stream for user
-            decode_PDDCHU_stream(pdcchu_stream)  #decode the PDDCHU stream for user          
+            decode_PDCCHU_stream(pdcchu_stream)  #decode the PDCCHU stream for user          
             message = PDSCHU_to_string(user_ident) #decode the PDSCHU stream for user
             print(message)
             key = message.split("key is ")[1].split()[0] #slice to extract the key
