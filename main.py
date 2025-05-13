@@ -56,21 +56,13 @@ qamMatrix = tfMatrix_short[2:] #removing the 2 synchronized symbols
 
 
 # Proof that the first symbol is BPSK
-#for j in range (2):
-    #print(f"Symbole {j+1}")
-    #for k in range (len(qamMatrix)):
-        #print(qamMatrix[j][k])
 
-def matrix_to_seq(qam_matrix):
-    """
-    Utile ?
-    """
-    seq = []
-    for j in range (2):
-        for k in range (len(qam_matrix)):
-            seq.append(qam_matrix[j][k])
-    return seq
-
+"""
+for j in range (2):
+    print(f"Symbole {j+1}")
+    for k in range (len(qamMatrix)):
+       print(qamMatrix[j][k])
+"""
 
 def bpsk_demod(qamSeq):
     """
@@ -84,11 +76,6 @@ def bpsk_demod(qamSeq):
             seq_final.append(1)
     return seq_final
 
-#seq_decode = bpsk_demod(matrix_to_seq(qamMatrix))
-#print(seq_decode)
-#print(seq_decode)
-
-#print (len(pbch_matrix_seq))
 
 def hamming748_decode(seq):
     """
@@ -211,34 +198,39 @@ def qpsk_demod(qamSeq):
 
 
 def PDDCHU_decode_seq(qam_seq, user_ident):
-    if Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 0: #BPSK7
-        bpsk_decoded = bpsk_demod(qam_seq)
-        #print("Séquence BPSK décodée :", bpsk_decoded)
+    """
+    Function to decode PDCCHU sequence"""
+    if Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 0: #BPSK
         return hamming748_decode(bpsk_demod(qam_seq))
         
     elif Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"] == 2: #QPSK
         return hamming748_decode(qpsk_demod(qam_seq))
     else:
-        print("La fec n'est pas reconnue") 
+        print("Unknow MCS")
+        raise ValueError("MCS non prit en charge")
 
 
 def PDCCHU_decode_from_user(user_ident):
     symb_start = Dic_info_user["user_ident", user_ident]["Symb_start_of_PDCCHU"]
     RB_start = Dic_info_user["user_ident", user_ident]["RB_start_of_PDCCHU"]
     MCS = Dic_info_user["user_ident", user_ident]["MCS_of_PDCCHU"]
-    if MCS == 0: nb_symbols=72 
-    else: nb_symbols=36
+    #nb_symbols according to MCS (modulation and coding scheme)
+    if MCS == 0: nb_symbols=72 #BPSK
+    else: nb_symbols=36 #QPSK
 
-    start_index = (symb_start - 1) * 624 + (RB_start - 1) * 12 #décale en 1D le départ
-    end_index = start_index + (nb_symbols) # décale en 1D l'arrivée
+    start_index = (symb_start - 1) * 624 + (RB_start - 1) * 12 #flatten the starting index to fit with the 1D matrix
+    end_index = start_index + (nb_symbols) # flatten the ending index to fit with the 1D matrix
 
-    qam_seq = tfMatrix_short.flatten('C')[start_index:end_index] #matrice de T/F en 1D (flatten)
+    qam_seq = tfMatrix_short.flatten('C')[start_index:end_index] #flatten the matrix to 1D
     return PDDCHU_decode_seq(qam_seq, user_ident)
 
 
 #print(PDCCHU_decode_from_user(2))
 
 def decode_PDDCHU_stream(pdcchu_stream):
+    """
+    Funciton to fill the dictionnary with PDCCHU infos
+    """
     user_ident = pdcchu_stream[:8]
     MCS_of_PDSCHU = pdcchu_stream[8:14]
     sym_start_PDSCHU = pdcchu_stream[14:18]
@@ -257,28 +249,36 @@ def decode_PDDCHU_stream(pdcchu_stream):
     return bin2dec(user_ident),bin2dec(MCS_of_PDSCHU),bin2dec(sym_start_PDSCHU), bin2dec(RB_start_PDSCHU), bin2dec(RB_size), bin2dec(CRC_flag)
 
 
-#print(Dic_info_user["user_ident", 2])
 
 def PDSCH_demod(qamSeq,mcs):
-    # je ne comprend pas le truc avec le rate mais dans le code de noan ça a pas l'air important
-    if mcs%5 == 0:
+    """
+    Function to demodulate PDSCH sequence
+    """
+    if mcs%5 == 0: #each case, depends on the MCS, see doc
         return bpsk_demod(qamSeq)
     elif mcs in [i for i in range (1,37,5)]:
         return qpsk_demod(qamSeq)
     elif mcs in [k for k in range (2,38,5)]:
         return qam16_demod(qamSeq)
     else :
-        raise "MCS non prit en charge"
+        raise ValueError("Unknow MCS")
     
 def PDSCH_fec(qamSeq,mcs):
+    """
+    Function to decode PDSCH sequence"""
     if mcs in [25,26,27]:
-        return hamming748_decode(qamSeq)
+        return hamming748_decode(qamSeq) #hamming decoding
     elif mcs in [5,6,7]:
-        return (fec.FECConv(('1011011','1111001'),6)).viterbi_decoder(np.array(qamSeq).astype(int),'hard').astype(int).tolist()
+        return (fec.FECConv(('1011011','1111001'),6)).viterbi_decoder(np.array(qamSeq).astype(int),'hard').astype(int).tolist() #convolutional decoding, according to the doc
     else :
-        raise "MCS non prit en charge"
+        raise ValueError("Unknow MCS")
     
 def decode_PDSCHU(user_ident):
+    """
+    Function to decode PDSCHU for a user
+    """
+
+    #scraping the user info from the dictionnary
     user = Dic_info_user["user_ident", user_ident]
     symb_start = user["sym_start_PDSCHU"]
     rb_start = user["RB_start_PDSCHU"]
@@ -286,49 +286,52 @@ def decode_PDSCHU(user_ident):
     mcs = user["MCS_of_PDSCHU"]
     crc_size = user["CRC_flag"]
 
-    start_index = (symb_start - 1) * 624 + (rb_start - 1) * 12 #décale en 1D le départ
-    end_index = start_index + (rb_size * 12) # décale en 1D l'arrivée
-    qamSeq = tfMatrix_short.flatten('C')[start_index:end_index] #matrice de T/F en 1D (flatten)
+    start_index = (symb_start - 1) * 624 + (rb_start - 1) * 12 # flatten the starting index to fit with the 1D matrix
+    end_index = start_index + (rb_size * 12) #flatten the ending index to fit with the 1D matrix
+    qamSeq = tfMatrix_short.flatten('C')[start_index:end_index] #flatten the matrix to 1D
 
-    demod = PDSCH_demod(qamSeq, mcs)
-    fec = PDSCH_fec(demod, mcs)
-    if PDSCH_crc(fec, crc_size):
+    demod = PDSCH_demod(qamSeq, mcs) #start demodulating the sequence
+    fec = PDSCH_fec(demod, mcs) #start fec decoding
+    if PDSCH_crc(fec, crc_size): #check if the crc is valid
         return fec
     else:
-        raise ValueError("CRC invalide")
-
+        raise ValueError("CRC error") 
 
 
 def PDSCH_crc(qamSeq,crcSize):
-    crc_poly = get_crc_poly(8*(1+crcSize))
-    return crc_decode(qamSeq,crc_poly)
+    """
+    Function to check the CRC of the PDSCH sequence"""
+    crc_poly = get_crc_poly(8*(1+crcSize)) #create the CRC polynomial
+    return crc_decode(qamSeq,crc_poly) #use the crc_decode function
 
 def PDSCHU_to_string(user_ident):
-    mess = bitToByte(decode_PDSCHU(user_ident))
-    real_mess = cesarDecode(user_ident,mess)
-    final_mess = "".join(toASCII(real_mess))
+    """
+    Function to convert the PDSCHU sequence to a string
+    """
+    mess = bitToByte(decode_PDSCHU(user_ident)) #bit->byte
+    real_mess = cesarDecode(user_ident,mess) #cesar decoding (doc)
+    final_mess = "".join(toASCII(real_mess)) #ASCII conversion
     return final_mess
 
 def extract_key():
+    """
+    Main function to extract the keys of all users
+    """
     global Dic_key
-    pbchu()
+    decode_pbchu() #decode the PBCHU, catch the user info for each user (pbchu only)
     Dic_key = {}
     for user_ident_tuple in Dic_info_user:
-        user_ident = user_ident_tuple[1]
+        user_ident = user_ident_tuple[1] #user is 2nd element
         try:
-            pdcchu_stream = PDCCHU_decode_from_user(user_ident)
-            decode_PDDCHU_stream(pdcchu_stream)            
-            message = PDSCHU_to_string(user_ident)
+            pdcchu_stream = PDCCHU_decode_from_user(user_ident) #decode the PDCCHU stream for user
+            decode_PDDCHU_stream(pdcchu_stream)  #decode the PDDCHU stream for user          
+            message = PDSCHU_to_string(user_ident) #decode the PDSCHU stream for user
             print(message)
-            key = message.split("key is ")[1].split()[0]
+            key = message.split("key is ")[1].split()[0] #slice to extract the key
             Dic_key[user_ident] = key 
         except Exception as e:
-            print(f"erreur utilisateur {user_ident} :", e) #il y a un probleme de l'user 11
+            print(f"user error {user_ident} :", e)
 
 
 extract_key()
-#pdcchu_stream = PDCCHU_decode_from_user(11)
-#decode_PDDCHU_stream(pdcchu_stream)            
-#message = PDSCHU_to_string(11)
-
 print(Dic_key)
