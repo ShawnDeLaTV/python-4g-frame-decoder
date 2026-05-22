@@ -1,5 +1,0 @@
-2.1) taille de la matrice 1024 car puissance de 2 on aime bien dans la fft
-14 ofdm pck ça fait 1ms (? jsp c'est le prof qui a dit)
-
-
-Nouvelle dimension : 624 pck c'est que le utile
