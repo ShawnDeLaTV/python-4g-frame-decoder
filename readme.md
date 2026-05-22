@@ -1,12 +1,11 @@
-# NilNovi Compiler - Wireless Network Signal Decoder
+# 4G Frame Decoder - Wireless Network Signal Decoder
 
 > 💡 **Note:** This project was originally developed in 2025 on a private school GitLab instance and has been migrated here to be made public.
 
 A Python-based signal processing and decoding tool for extracting encrypted user data from wireless network communications using advanced modulation and forward error correction techniques.
 
 ## Overview
-
-NilNovi Compiler is a specialized decoder designed to process complex wireless network signals transmitted over OFDM (Orthogonal Frequency-Division Multiplexing) channels. It implements multi-layered demodulation and decoding strategies to extract and decrypt user messages from encoded signal matrices.
+A specialized decoder designed to process complex wireless network signals transmitted over OFDM (Orthogonal Frequency-Division Multiplexing) channels. It implements multi-layered demodulation and decoding strategies to extract and decrypt user messages from encoded signal matrices.
 
 The project demonstrates expertise in:
 - **Signal Processing**: Complex matrix manipulation and signal extraction
@@ -18,8 +17,8 @@ The project demonstrates expertise in:
 ## Project Structure
 
 ```
-NilNovi-compiler/
-├── reseauxsansfils/          # Main project directory
+
+├── python-4g-frame-decoder/  # Main project directory
 │   ├── main.py               # Core decoder logic
 │   ├── imports.py            # Centralized module imports
 │   ├── qam16_demod.py        # QAM-16 demodulation
@@ -326,7 +325,7 @@ For questions, bug reports, or contributions, please contact the project maintai
 
 ---
 
-**Project Name**: NilNovi Compiler  
+**Project Name**: 4G Frame Decoder  
 **Version**: 1.0  
 **Last Updated**: 2024  
 **Status**: Active Development
