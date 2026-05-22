@@ -320,10 +320,6 @@ The decoder implements robust error handling:
 - **scikit-dsp-comm**: Digital signal processing and communications
 - **pytest**: Unit testing framework
 
-## License
-
-[Specify your license here - e.g., MIT, GPL-3.0]
-
 ## Contact & Contribution
 
 For questions, bug reports, or contributions, please contact the project maintainer or submit issues through the project repository.
